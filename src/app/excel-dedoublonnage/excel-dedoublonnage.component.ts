@@ -30,6 +30,7 @@ export class ExcelDedoublonnageComponent {
   totalRows = 0;
   totalDuplicatesRemoved = 0;
   isFileLoaded = false;
+  totalValidCleanedRows = 0;
 
   /**
    * Cette méthode est appelée quand l'utilisateur sélectionne un fichier Excel.
@@ -69,7 +70,11 @@ export class ExcelDedoublonnageComponent {
 
       // Reconstruction des lignes à partir de la vraie ligne d'entête
       this.originalRows = this.buildRowsFromRawData(rawData);
-      this.totalRows = this.originalRows.length;
+      // On compte uniquement les lignes qui ont un SIRET
+      this.totalRows = this.originalRows.filter(row => {
+        const siret = this.normalizeSiret(this.findSiretValue(row));
+        return !!siret;
+      }).length;
 
       // Traitement des doublons
       this.processRows();
@@ -139,9 +144,13 @@ export class ExcelDedoublonnageComponent {
       // index 0 = ligne 3 Excel
       const excelLineNumber = index + 3;
 
-      // Si le SIRET ou le nom est vide, on garde la ligne
-      // car on ne peut pas appliquer correctement la règle métier
-      if (!normalizedSiret || !normalizedNom) {
+      // ❌ On ignore les lignes sans SIRET
+      if (!normalizedSiret) {
+        return;
+      }
+
+      // Si le nom est vide, on garde la ligne (au choix métier)
+      if (!normalizedNom) {
         cleaned.push(row);
         return;
       }
@@ -176,9 +185,19 @@ export class ExcelDedoublonnageComponent {
       // donc elle est supprimée du fichier final
     });
 
-    this.cleanedRows = cleaned;
-    this.duplicateInfos = Array.from(duplicatesMap.values());
-    this.totalDuplicatesRemoved = this.originalRows.length - this.cleanedRows.length;
+   this.cleanedRows = cleaned;
+   this.duplicateInfos = Array.from(duplicatesMap.values());
+
+    // On compte uniquement les lignes conservées qui ont un SIRET
+    this.totalValidCleanedRows = this.cleanedRows.filter(row => {
+      const siret = this.normalizeSiret(this.findSiretValue(row));
+      return !!siret;
+    }).length;
+
+    // Le nombre de doublons supprimés se calcule uniquement
+    // à partir des lignes qui ont un SIRET
+      this.totalDuplicatesRemoved = this.totalRows - this.totalValidCleanedRows;
+
   }
 
   /**
