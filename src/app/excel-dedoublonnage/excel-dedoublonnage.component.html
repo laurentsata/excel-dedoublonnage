@@ -1,0 +1,71 @@
+<section class="excel-cleaner">
+  <h1>Nettoyage des doublons SIRET + NOM</h1>
+
+  <!-- Zone d'import du fichier Excel -->
+  <div class="upload-block">
+    <label for="excelFile" class="upload-label">
+      Importer un fichier Excel
+    </label>
+
+    <input
+      id="excelFile"
+      type="file"
+      accept=".xlsx,.xls"
+      (change)="onFileChange($event)"
+    />
+  </div>
+
+  @if (isFileLoaded) {
+    <!-- Résumé du traitement -->
+    <div class="summary-block">
+      <h2>Résumé</h2>
+
+      <p><strong>Fichier :</strong> {{ fileName }}</p>
+      <p><strong>Feuille :</strong> {{ sheetName }}</p>
+      <p><strong>Nombre total de lignes :</strong> {{ totalRows }}</p>
+      <p><strong>Nombre de lignes conservées :</strong> {{ cleanedRows.length }}</p>
+      <p><strong>Nombre de doublons supprimés :</strong> {{ totalDuplicatesRemoved }}</p>
+    </div>
+
+    <!-- Boutons d'action -->
+    <div class="actions-block">
+      <button type="button" (click)="downloadCleanedFile()">
+        Télécharger le fichier nettoyé
+      </button>
+
+      <button type="button" (click)="reset()">
+        Réinitialiser
+      </button>
+    </div>
+
+    <!-- Affichage des doublons détectés -->
+    <div class="duplicates-block">
+      <h2>Doublons détectés</h2>
+
+      @if (duplicateInfos.length > 0) {
+        <table>
+          <thead>
+            <tr>
+              <th>SIRET</th>
+              <th>Nom</th>
+              <th>Première ligne conservée</th>
+              <th>Lignes supprimées</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (duplicate of duplicateInfos; track duplicate.siret + duplicate.nom) {
+              <tr>
+                <td>{{ duplicate.siret }}</td>
+                <td>{{ duplicate.nom }}</td>
+                <td>{{ duplicate.firstLine }}</td>
+                <td>{{ duplicate.duplicateLines.join(', ') }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p>Aucun doublon détecté.</p>
+      }
+    </div>
+  }
+</section>
