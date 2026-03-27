@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import * as XLSX from 'xlsx';
 
 interface ExcelRow {
@@ -43,6 +43,7 @@ export class ExcelDedoublonnageComponent {
   duplicateInfos: DuplicateInfo[] = [];
   siretErrors: SiretErrorInfo[] = [];
   fieldErrors: FieldErrorInfo[] = [];
+  @ViewChild('fileInput') fileInputRef!: ElementRef<HTMLInputElement>;
 
   fileName = '';
   sheetName = '';
@@ -703,6 +704,11 @@ reset(): void {
 
   // Cette ligne indique qu'aucun fichier n'est chargé
   this.isFileLoaded = false;
+
+  // Cette ligne vide visuellement l'input file dans le DOM
+  if (this.fileInputRef?.nativeElement) {
+    this.fileInputRef.nativeElement.value = '';
+  }
 }
 
 
