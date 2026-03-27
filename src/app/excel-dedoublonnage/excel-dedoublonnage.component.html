@@ -29,9 +29,14 @@
 
     <!-- Boutons d'action -->
     <div class="actions-block">
-      <button type="button" (click)="downloadCleanedFile()">
-        Télécharger le fichier nettoyé
-      </button>
+      <button
+  type="button"
+  (click)="downloadCleanedFile()"
+  [disabled]="hasBlockingErrors()"
+  [class.error-button]="hasBlockingErrors()"
+>
+  {{ hasBlockingErrors() ? 'Vérifiez les erreurs' : 'Télécharger le fichier nettoyé' }}
+</button>
 
       <button type="button" (click)="reset()">
         Réinitialiser
@@ -67,5 +72,73 @@
         <p>Aucun doublon détecté.</p>
       }
     </div>
+
+    <div class="field-errors-block">
+  <h2>Erreurs de champs</h2>
+
+  <p><strong>Nombre d'erreurs métier :</strong> {{ totalFieldErrors }}</p>
+
+  @if (fieldErrors.length > 0) {
+    <table>
+      <thead>
+        <tr>
+          <th>Ligne</th>
+          <th>SIRET</th>
+          <th>Nom</th>
+          <th>Champ</th>
+          <th>Valeur trouvée</th>
+          <th>Erreur</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (error of fieldErrors; track error.lineNumber + error.field + error.originalValue) {
+          <tr>
+            <td>{{ error.lineNumber }}</td>
+            <td>{{ error.siret }}</td>
+            <td>{{ error.nom }}</td>
+            <td>{{ error.field }}</td>
+            <td>{{ error.originalValue }}</td>
+            <td>{{ error.reason }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p>Aucune erreur détectée sur les champs sexe et actif.</p>
+  }
+</div>
+
+<div class="siret-errors-block">
+  <h2>Erreurs de SIRET</h2>
+
+  <p><strong>Nombre de SIRET en erreur :</strong> {{ totalSiretErrors }}</p>
+
+  @if (siretErrors.length > 0) {
+    <table>
+      <thead>
+        <tr>
+          <th>Ligne</th>
+          <th>SIRET</th>
+          <th>Nom</th>
+          <th>Longueur</th>
+          <th>Erreur</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (error of siretErrors; track error.lineNumber + error.siret) {
+          <tr>
+            <td>{{ error.lineNumber }}</td>
+            <td>{{ error.siret }}</td>
+            <td>{{ error.nom }}</td>
+            <td>{{ error.length }}</td>
+            <td>{{ error.reason }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p>Aucune erreur de longueur détectée sur les SIRET.</p>
+  }
+</div>
   }
 </section>

@@ -55,3 +55,13 @@ td {
 thead {
   background: #f5f5f5;
 }
+
+.siret-errors-block,
+.field-errors-block {
+  margin-top: 24px;
+}
+
+button.error-button {
+  background: #c62828;
+  color: #fff;
+}
