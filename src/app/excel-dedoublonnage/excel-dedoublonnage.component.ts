@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import * as XLSX from 'xlsx';
 
 interface ExcelRow {
@@ -13,6 +13,23 @@ interface DuplicateInfo {
   duplicateLines: number[];
 }
 
+interface SiretErrorInfo {
+  siret: string;
+  nom: string;
+  lineNumber: number;
+  length: number;
+  reason: string;
+}
+
+interface FieldErrorInfo {
+  lineNumber: number;
+  field: string;
+  originalValue: string;
+  reason: string;
+  nom: string;
+  siret: string;
+}
+
 @Component({
   selector: 'app-excel-dedoublonnage',
   standalone: true,
@@ -24,12 +41,17 @@ export class ExcelDedoublonnageComponent {
   originalRows: ExcelRow[] = [];
   cleanedRows: ExcelRow[] = [];
   duplicateInfos: DuplicateInfo[] = [];
+  siretErrors: SiretErrorInfo[] = [];
+  fieldErrors: FieldErrorInfo[] = [];
+  @ViewChild('fileInput') fileInputRef!: ElementRef<HTMLInputElement>;
 
   fileName = '';
   sheetName = '';
   totalRows = 0;
   totalDuplicatesRemoved = 0;
   totalValidCleanedRows = 0;
+  totalSiretErrors = 0;
+  totalFieldErrors = 0;
   isFileLoaded = false;
 
   /**
@@ -93,36 +115,39 @@ export class ExcelDedoublonnageComponent {
    * - ligne 2 Excel = vraie ligne d'entête
    * - ligne 3+ Excel = données
    */
-  buildRowsFromRawData(rawData: any[][]): ExcelRow[] {
-    if (!rawData || rawData.length < 2) {
-      return [];
-    }
-
-    // Cette ligne récupère la vraie ligne d'entête
-    const headerRow = rawData[1];
-
-    // Cette ligne récupère toutes les lignes de données
-    const dataRows = rawData.slice(2);
-
-    return dataRows.map((row: any[]) => {
-      const rowObject: ExcelRow = {};
-
-      headerRow.forEach((headerCell: any, index: number) => {
-        // Cette ligne sécurise le nom de colonne
-        const columnName = String(headerCell ?? '').trim();
-
-        // Cette condition ignore les colonnes sans nom
-        if (!columnName) {
-          return;
-        }
-
-        // Cette ligne reconstruit l'objet avec le bon nom de colonne
-        rowObject[columnName] = row[index] ?? '';
-      });
-
-      return rowObject;
-    });
+ buildRowsFromRawData(rawData: any[][]): ExcelRow[] {
+  if (!rawData || rawData.length < 2) {
+    return [];
   }
+
+  // Cette ligne récupère la vraie ligne d'entête
+  const headerRow = rawData[1];
+
+  // Cette ligne récupère toutes les lignes de données
+  const dataRows = rawData.slice(2);
+
+  return dataRows.map((row: any[], dataIndex: number) => {
+    const rowObject: ExcelRow = {};
+
+    headerRow.forEach((headerCell: any, index: number) => {
+      // Cette ligne sécurise le nom de colonne
+      const columnName = String(headerCell ?? '').trim();
+
+      // Cette condition ignore les colonnes sans nom
+      if (!columnName) {
+        return;
+      }
+
+      // Cette ligne reconstruit l'objet avec le bon nom de colonne
+      rowObject[columnName] = row[index] ?? '';
+    });
+
+    // Cette ligne mémorise le vrai numéro de ligne Excel d'origine
+    rowObject['__excelLineNumber'] = dataIndex + 3;
+
+    return rowObject;
+  });
+}
 
   /**
    * Cette méthode traite les lignes importées :
@@ -148,7 +173,8 @@ export class ExcelDedoublonnageComponent {
       const normalizedNom = this.normalizeText(rawNom);
 
       // Cette ligne calcule le vrai numéro de ligne Excel
-      const excelLineNumber = index + 3;
+      // Cette ligne récupère le vrai numéro de ligne Excel d'origine
+      const excelLineNumber = Number(row['__excelLineNumber'] ?? index + 3);
 
       // Cette condition ignore les lignes sans SIRET
       if (!normalizedSiret) {
@@ -199,6 +225,116 @@ export class ExcelDedoublonnageComponent {
 
     // Cette ligne calcule le nombre réel de doublons supprimés
     this.totalDuplicatesRemoved = this.totalRows - this.totalValidCleanedRows;
+
+    // Cette ligne analyse les erreurs de longueur sur les SIRET après dédoublonnage
+    this.analyzeSiretErrors();
+
+    // Cette ligne analyse les erreurs métier sur sexe et actif
+    this.analyzeFieldErrors();
+  }
+
+  /**
+   * Cette méthode analyse les SIRET après dédoublonnage
+   * et repère ceux dont la longueur est différente de 14.
+   */
+  analyzeSiretErrors(): void {
+    this.siretErrors = this.cleanedRows
+      .map((row, index) => {
+        // Cette ligne récupère le SIRET de la ligne courante
+        const siret = this.normalizeSiret(this.findSiretValue(row));
+
+        // Cette ligne récupère le NOM pour l'affichage
+        const nom = String(this.findNomValue(row) ?? '').trim();
+
+        // Cette ligne calcule le numéro de ligne dans le tableau nettoyé
+        const lineNumber = Number(row['__excelLineNumber'] ?? index + 3);
+
+        // Cette condition ignore les lignes sans SIRET
+        if (!siret) {
+          return null;
+        }
+
+        // Cette condition ignore les SIRET corrects de 14 chiffres
+        if (siret.length === 14) {
+          return null;
+        }
+
+        // Cette ligne construit le motif de l'erreur
+        const reason =
+          siret.length < 14
+            ? 'Inférieur à 14 chiffres'
+            : 'Supérieur à 14 chiffres';
+
+        return {
+          siret,
+          nom,
+          lineNumber,
+          length: siret.length,
+          reason
+        } as SiretErrorInfo;
+      })
+      .filter((item): item is SiretErrorInfo => item !== null);
+
+    // Cette ligne calcule le nombre total d'erreurs SIRET
+    this.totalSiretErrors = this.siretErrors.length;
+  }
+
+  /**
+   * Cette méthode analyse les champs métier après dédoublonnage
+   * et repère les erreurs sur sexe et actif.
+   */
+  analyzeFieldErrors(): void {
+    this.fieldErrors = this.cleanedRows.flatMap((row, index) => {
+      const errors: FieldErrorInfo[] = [];
+
+      // Cette ligne calcule le numéro de ligne dans le tableau nettoyé
+      const lineNumber = Number(row['__excelLineNumber'] ?? index + 3);
+
+      // Cette ligne récupère les infos utiles pour l'affichage
+      const siret = this.normalizeSiret(this.findSiretValue(row));
+      const nom = String(this.findNomValue(row) ?? '').trim();
+
+      // Cette ligne lit la valeur brute du sexe
+      const rawSexe = String(this.findSexeValue(row) ?? '').trim();
+
+      // Cette ligne lit la valeur brute du champ actif
+      const rawActif = String(this.findActifValue(row) ?? '').trim();
+
+      // Cette ligne tente de normaliser le sexe
+      const normalizedSexe = this.normalizeSexe(rawSexe);
+
+      // Cette ligne tente de normaliser actif
+      const normalizedActif = this.normalizeActif(rawActif);
+
+      // Cette condition détecte une erreur sur le sexe
+      if (rawSexe && !normalizedSexe) {
+        errors.push({
+          lineNumber,
+          field: 'sexe',
+          originalValue: rawSexe,
+          reason: 'Valeur sexe invalide',
+          nom,
+          siret
+        });
+      }
+
+      // Cette condition détecte une erreur sur actif
+      if (rawActif && !normalizedActif) {
+        errors.push({
+          lineNumber,
+          field: 'actif',
+          originalValue: rawActif,
+          reason: 'Valeur actif invalide',
+          nom,
+          siret
+        });
+      }
+
+      return errors;
+    });
+
+    // Cette ligne calcule le nombre total d'erreurs métier
+    this.totalFieldErrors = this.fieldErrors.length;
   }
 
   /**
@@ -330,6 +466,78 @@ export class ExcelDedoublonnageComponent {
       .trim()
       .toUpperCase();
   }
+/**
+ * Cette méthode normalise la valeur du sexe.
+ */
+normalizeSexe(value: unknown): string {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+
+  // Cette condition accepte une valeur déjà normalisée pour femme
+  if (normalized === '2') {
+    return '2';
+  }
+
+  // Cette condition accepte une valeur déjà normalisée pour homme
+  if (normalized === '1') {
+    return '1';
+  }
+
+  // Cette condition gère les valeurs féminines
+  if (
+    normalized === 'femme' ||
+    normalized === 'féminin' ||
+    normalized === 'feminin' ||
+    normalized === 'F'
+  ) {
+    return '2';
+  }
+
+  // Cette condition gère les valeurs masculines
+  if (
+    normalized === 'homme' ||
+    normalized === 'masculin' ||
+    normalized === 'M'
+  ) {
+    return '1';
+  }
+
+  // Cette ligne retourne vide si la valeur est invalide
+  return '';
+}
+
+/**
+ * Cette méthode normalise la valeur actif.
+ */
+  normalizeActif(value: unknown): string {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+
+  // Cette condition accepte une valeur déjà normalisée active
+  if (normalized === '1') {
+    return '1';
+  }
+
+  // Cette condition accepte une valeur déjà normalisée inactive
+  if (normalized === '0') {
+    return '0';
+  }
+
+  // Cette condition transforme oui en 1
+  if (normalized === 'oui') {
+    return '1';
+  }
+
+  // Cette condition transforme non en 0
+  if (normalized === 'non') {
+    return '0';
+  }
+
+  // Cette ligne retourne vide si la valeur est invalide
+  return '';
+}
 
   /**
    * Cette méthode transforme une ligne source vers le format CSV final attendu.
@@ -348,11 +556,11 @@ export class ExcelDedoublonnageComponent {
       // Cette ligne mappe le prénom vers la colonne finale "prenom"
       prenom: this.findPrenomValue(row),
 
-      // Cette ligne mappe le sexe vers la colonne finale "sexe"
-      sexe: this.findSexeValue(row),
+      // Cette ligne normalise le sexe vers 1 ou 2
+      sexe: this.normalizeSexe(this.findSexeValue(row)),
 
-      // Cette ligne mappe l'actif vers la colonne finale "actif"
-      actif: this.findActifValue(row),
+      // Cette ligne normalise actif vers 1 ou 0
+      actif: this.normalizeActif(this.findActifValue(row)),
 
       // Cette ligne mappe le rôle vers la colonne finale "role"
       role: this.findRoleValue(row)
@@ -428,7 +636,7 @@ export class ExcelDedoublonnageComponent {
     });
 
     // Cette ligne force Excel à utiliser le séparateur point-virgule
-    return ['sep=;', headerLine, ...dataLines].join('\n');
+    return ['sep=;', headerLine, ...dataLines].join('\r\n');
   }
 
   /**
@@ -441,7 +649,8 @@ export class ExcelDedoublonnageComponent {
     if (
       stringValue.includes(';') ||
       stringValue.includes('"') ||
-      stringValue.includes('\n')
+      stringValue.includes('\n') ||
+      stringValue.includes('\r')
     ) {
       const escapedValue = stringValue.replace(/"/g, '""');
       return `"${escapedValue}"`;
@@ -451,6 +660,13 @@ export class ExcelDedoublonnageComponent {
   }
 
   /**
+ * Cette méthode indique s'il existe au moins une erreur bloquante.
+ */
+hasBlockingErrors(): boolean {
+  return this.totalSiretErrors > 0 || this.totalFieldErrors > 0;
+}
+
+  /**
    * Cette méthode construit le nom du fichier CSV exporté.
    */
   buildOutputFileName(): string {
@@ -458,18 +674,44 @@ export class ExcelDedoublonnageComponent {
     return `${baseName}_sans_doublons.csv`;
   }
 
-  /**
-   * Cette méthode remet le composant à zéro.
-   */
-  reset(): void {
-    this.originalRows = [];
-    this.cleanedRows = [];
-    this.duplicateInfos = [];
-    this.fileName = '';
-    this.sheetName = '';
-    this.totalRows = 0;
-    this.totalValidCleanedRows = 0;
-    this.totalDuplicatesRemoved = 0;
-    this.isFileLoaded = false;
+/**
+ * Cette méthode remet le composant à zéro.
+ */
+reset(): void {
+  // Cette ligne vide les données d'origine
+  this.originalRows = [];
+
+  // Cette ligne vide les données nettoyées
+  this.cleanedRows = [];
+
+  // Cette ligne vide les doublons détectés
+  this.duplicateInfos = [];
+
+  // Cette ligne vide les erreurs SIRET
+  this.siretErrors = [];
+
+  // Cette ligne vide les erreurs métier
+  this.fieldErrors = [];
+
+  // Cette ligne réinitialise les infos fichier
+  this.fileName = '';
+  this.sheetName = '';
+
+  // Cette ligne remet les compteurs à zéro
+  this.totalRows = 0;
+  this.totalValidCleanedRows = 0;
+  this.totalDuplicatesRemoved = 0;
+  this.totalSiretErrors = 0;
+  this.totalFieldErrors = 0;
+
+  // Cette ligne indique qu'aucun fichier n'est chargé
+  this.isFileLoaded = false;
+
+  // Cette ligne vide visuellement l'input file dans le DOM
+  if (this.fileInputRef?.nativeElement) {
+    this.fileInputRef.nativeElement.value = '';
   }
+}
+
+
 }
