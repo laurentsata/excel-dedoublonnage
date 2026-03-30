@@ -488,7 +488,8 @@ normalizeSexe(value: unknown): string {
   if (
     normalized === 'femme' ||
     normalized === 'féminin' ||
-    normalized === 'feminin'
+    normalized === 'feminin' ||
+    normalized === 'F'
   ) {
     return '2';
   }
@@ -496,7 +497,8 @@ normalizeSexe(value: unknown): string {
   // Cette condition gère les valeurs masculines
   if (
     normalized === 'homme' ||
-    normalized === 'masculin'
+    normalized === 'masculin' ||
+    normalized === 'M'
   ) {
     return '1';
   }
