@@ -428,16 +428,17 @@ export class ExcelDedoublonnageComponent {
    * Cette méthode recherche la valeur du champ actif.
    */
   findActifValue(row: ExcelRow): string {
-    const possibleKeys = ['Actif', 'ACTIF', 'actif'];
+  for (const key in row) {
+    const normalizedKey = key.trim().toLowerCase();
 
-    for (const key of possibleKeys) {
-      if (key in row) {
-        return String(row[key] ?? '').trim();
-      }
+    // 🔥 on détecte toutes les variantes
+    if (normalizedKey.includes('actif')) {
+      return String(row[key] ?? '').trim();
     }
-
-    return '';
   }
+
+  return '';
+}
 
   /**
    * Cette méthode recherche la valeur du rôle.
