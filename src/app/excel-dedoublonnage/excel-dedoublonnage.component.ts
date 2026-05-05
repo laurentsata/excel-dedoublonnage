@@ -407,16 +407,22 @@ export class ExcelDedoublonnageComponent {
    * Cette méthode recherche la valeur du sexe.
    */
   findSexeValue(row: ExcelRow): string {
-    const possibleKeys = ['Sexe', 'SEXE', 'sexe'];
+  const possibleKeys = ['Sexe', 'SEXE', 'sexe'];
 
-    for (const key of possibleKeys) {
-      if (key in row) {
-        return String(row[key] ?? '').trim();
-      }
+  for (const key in row) {
+    const normalizedKey = key.trim().toLowerCase();
+
+    // ✔️ match exact OU contient le mot
+    if (
+      possibleKeys.includes(normalizedKey) ||
+      normalizedKey.includes('sexe')
+    ) {
+      return String(row[key] ?? '').trim();
     }
-
-    return '';
   }
+
+  return '';
+}
 
   /**
    * Cette méthode recherche la valeur du champ actif.
@@ -489,7 +495,8 @@ normalizeSexe(value: unknown): string {
     normalized === 'femme' ||
     normalized === 'féminin' ||
     normalized === 'feminin' ||
-    normalized === 'F'
+    normalized === 'F' ||
+    normalized === 'f'
   ) {
     return '2';
   }
@@ -498,7 +505,8 @@ normalizeSexe(value: unknown): string {
   if (
     normalized === 'homme' ||
     normalized === 'masculin' ||
-    normalized === 'M'
+    normalized === 'M' ||
+    normalized === 'm'
   ) {
     return '1';
   }
