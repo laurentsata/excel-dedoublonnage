@@ -306,6 +306,9 @@ export class ExcelDedoublonnageComponent {
       // Cette ligne tente de normaliser actif
       const normalizedActif = this.normalizeActif(rawActif);
 
+      // Cette ligne lit la valeur brute du rôle
+      const rawRole = String(this.findRoleValue(row) ?? '').trim();
+
       // Cette condition détecte une erreur sur le sexe
       if (rawSexe && !normalizedSexe) {
         errors.push({
@@ -329,6 +332,18 @@ export class ExcelDedoublonnageComponent {
           siret
         });
       }
+
+      // Cette condition détecte une erreur si le rôle est vide
+    if (!rawRole) {
+      errors.push({
+        lineNumber,
+        field: 'role',
+        originalValue: '',
+        reason: 'Rôle obligatoire manquant',
+        nom,
+        siret
+      });
+    }
 
       return errors;
     });
@@ -407,46 +422,54 @@ export class ExcelDedoublonnageComponent {
    * Cette méthode recherche la valeur du sexe.
    */
   findSexeValue(row: ExcelRow): string {
-    const possibleKeys = ['Sexe', 'SEXE', 'sexe'];
+  const possibleKeys = ['Sexe', 'SEXE', 'sexe'];
 
-    for (const key of possibleKeys) {
-      if (key in row) {
-        return String(row[key] ?? '').trim();
-      }
+  for (const key in row) {
+    const normalizedKey = key.trim().toLowerCase();
+
+    // ✔️ match exact OU contient le mot
+    if (
+      possibleKeys.includes(normalizedKey) ||
+      normalizedKey.includes('sexe')
+    ) {
+      return String(row[key] ?? '').trim();
     }
-
-    return '';
   }
+
+  return '';
+}
 
   /**
    * Cette méthode recherche la valeur du champ actif.
    */
   findActifValue(row: ExcelRow): string {
-    const possibleKeys = ['Actif', 'ACTIF', 'actif'];
+  for (const key in row) {
+    const normalizedKey = key.trim().toLowerCase();
 
-    for (const key of possibleKeys) {
-      if (key in row) {
-        return String(row[key] ?? '').trim();
-      }
+    // 🔥 on détecte toutes les variantes
+    if (normalizedKey.includes('actif')) {
+      return String(row[key] ?? '').trim();
     }
-
-    return '';
   }
 
-  /**
-   * Cette méthode recherche la valeur du rôle.
-   */
+  return '';
+}
+
   findRoleValue(row: ExcelRow): string {
-    const possibleKeys = ['Role', 'Rôle', 'ROLE', 'RÔLE', 'role', 'rôle'];
+    for (const key in row) {
+      const normalizedKey = key.trim().toLowerCase();
 
-    for (const key of possibleKeys) {
-      if (key in row) {
+      // 🔥 on détecte toutes les variantes
+      if (
+        normalizedKey.includes('role') ||
+        normalizedKey.includes('rôle')
+      ) {
         return String(row[key] ?? '').trim();
       }
     }
 
-    return '';
-  }
+  return '';
+}
 
   /**
    * Cette méthode normalise un SIRET.
@@ -489,7 +512,8 @@ normalizeSexe(value: unknown): string {
     normalized === 'femme' ||
     normalized === 'féminin' ||
     normalized === 'feminin' ||
-    normalized === 'F'
+    normalized === 'F' ||
+    normalized === 'f'
   ) {
     return '2';
   }
@@ -498,7 +522,8 @@ normalizeSexe(value: unknown): string {
   if (
     normalized === 'homme' ||
     normalized === 'masculin' ||
-    normalized === 'M'
+    normalized === 'M' ||
+    normalized === 'm'
   ) {
     return '1';
   }
