@@ -306,6 +306,9 @@ export class ExcelDedoublonnageComponent {
       // Cette ligne tente de normaliser actif
       const normalizedActif = this.normalizeActif(rawActif);
 
+      // Cette ligne lit la valeur brute du rôle
+      const rawRole = String(this.findRoleValue(row) ?? '').trim();
+
       // Cette condition détecte une erreur sur le sexe
       if (rawSexe && !normalizedSexe) {
         errors.push({
@@ -329,6 +332,18 @@ export class ExcelDedoublonnageComponent {
           siret
         });
       }
+
+      // Cette condition détecte une erreur si le rôle est vide
+    if (!rawRole) {
+      errors.push({
+        lineNumber,
+        field: 'role',
+        originalValue: '',
+        reason: 'Rôle obligatoire manquant',
+        nom,
+        siret
+      });
+    }
 
       return errors;
     });
@@ -440,20 +455,21 @@ export class ExcelDedoublonnageComponent {
   return '';
 }
 
-  /**
-   * Cette méthode recherche la valeur du rôle.
-   */
   findRoleValue(row: ExcelRow): string {
-    const possibleKeys = ['Role', 'Rôle', 'ROLE', 'RÔLE', 'role', 'rôle'];
+    for (const key in row) {
+      const normalizedKey = key.trim().toLowerCase();
 
-    for (const key of possibleKeys) {
-      if (key in row) {
+      // 🔥 on détecte toutes les variantes
+      if (
+        normalizedKey.includes('role') ||
+        normalizedKey.includes('rôle')
+      ) {
         return String(row[key] ?? '').trim();
       }
     }
 
-    return '';
-  }
+  return '';
+}
 
   /**
    * Cette méthode normalise un SIRET.
