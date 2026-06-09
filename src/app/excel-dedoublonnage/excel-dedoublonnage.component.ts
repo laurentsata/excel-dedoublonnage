@@ -54,6 +54,7 @@ export class ExcelDedoublonnageComponent {
   totalSiretErrors = 0;
   totalFieldErrors = 0;
   isFileLoaded = false;
+  isSuccessAlertVisible = true;
 
   // Cette ligne indique si la modale des erreurs est ouverte
   isErrorModalOpen = false;
@@ -105,6 +106,9 @@ export class ExcelDedoublonnageComponent {
 
       // Cette ligne lance le traitement de suppression des doublons
       this.processRows();
+
+      // Cette ligne réaffiche l'alerte succès à chaque nouveau fichier importé
+      this.isSuccessAlertVisible = true;
 
       this.isFileLoaded = true;
     };
@@ -765,6 +769,8 @@ export class ExcelDedoublonnageComponent {
     // Cette ligne réinitialise les infos fichier
     this.fileName = '';
     this.sheetName = '';
+
+    this.isSuccessAlertVisible = true;
 
     // Cette ligne remet les compteurs à zéro
     this.totalRows = 0;

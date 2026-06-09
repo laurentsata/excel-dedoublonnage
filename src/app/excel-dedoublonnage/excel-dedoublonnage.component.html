@@ -37,6 +37,28 @@
       }
     </div>
 
+@if (!hasBlockingErrors() && isSuccessAlertVisible) {
+  <div class="alert-success">
+    <div class="alert-success-icon">
+      ✓
+    </div>
+
+    <div class="alert-success-content">
+      <strong>Aucune erreur détectée</strong>
+      <span>Le fichier est prêt à être exporté.</span>
+    </div>
+
+<button
+  type="button"
+  class="alert-success-close"
+  aria-label="Masquer l'alerte"
+  (click)="isSuccessAlertVisible = false"
+>
+  ×
+</button>
+  </div>
+}
+
     <!-- Boutons d'action -->
     <div class="actions-block">
       @if (!hasBlockingErrors()) {
