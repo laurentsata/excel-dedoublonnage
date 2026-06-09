@@ -1,5 +1,5 @@
 <section class="excel-cleaner">
-  <h1>Nettoyage des doublons SIRET AVEC NOM</h1>
+  <h1>Nettoyage des doublons SIRET avec NOM</h1>
 
   <!-- Zone d'import du fichier Excel -->
   <div class="upload-block">
@@ -24,20 +24,39 @@
       <p><strong>Fichier :</strong> {{ fileName }}</p>
       <p><strong>Feuille :</strong> {{ sheetName }}</p>
       <p><strong>Nombre total de lignes :</strong> {{ totalRows }}</p>
-      <p><strong>Nombre de lignes conservées :</strong> {{ cleanedRows.length }}</p>
+      <p><strong>Nombre de lignes conservées :</strong> {{ totalValidCleanedRows }}</p>
       <p><strong>Nombre de doublons supprimés :</strong> {{ totalDuplicatesRemoved }}</p>
+
+      @if (hasBlockingErrors()) {
+        <div class="alert-error">
+          <strong>
+            {{ totalSiretErrors + totalFieldErrors }} erreur(s) détectée(s).
+          </strong>
+          Corrigez les erreurs avant de générer le CSV.
+        </div>
+      }
     </div>
 
     <!-- Boutons d'action -->
     <div class="actions-block">
-      <button
-  type="button"
-  (click)="downloadCleanedFile()"
-  [disabled]="hasBlockingErrors()"
-  [class.error-button]="hasBlockingErrors()"
->
-  {{ hasBlockingErrors() ? 'Vérifiez les erreurs' : 'Télécharger le fichier nettoyé' }}
-</button>
+      @if (!hasBlockingErrors()) {
+  <button
+    type="button"
+    (click)="downloadCleanedFile()"
+  >
+    Télécharger le fichier nettoyé
+  </button>
+}
+
+      @if (hasBlockingErrors()) {
+        <button
+          type="button"
+          class="error-button"
+          (click)="isErrorModalOpen = true"
+        >
+          Consulter les erreurs
+        </button>
+      }
 
       <button type="button" (click)="reset()">
         Réinitialiser
@@ -58,6 +77,7 @@
               <th>Lignes supprimées</th>
             </tr>
           </thead>
+
           <tbody>
             @for (duplicate of duplicateInfos; track duplicate.siret + duplicate.nom) {
               <tr>
@@ -73,73 +93,100 @@
         <p>Aucun doublon détecté.</p>
       }
     </div>
-
-    <div class="field-errors-block">
-  <h2>Erreurs de champs</h2>
-
-  <p><strong>Nombre d'erreurs métier :</strong> {{ totalFieldErrors }}</p>
-
-  @if (fieldErrors.length > 0) {
-    <table>
-      <thead>
-        <tr>
-          <th>Ligne</th>
-          <th>SIRET</th>
-          <th>Nom</th>
-          <th>Champ</th>
-          <th>Valeur trouvée</th>
-          <th>Erreur</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (error of fieldErrors; track error.lineNumber + error.field + error.originalValue) {
-          <tr>
-            <td>{{ error.lineNumber }}</td>
-            <td>{{ error.siret }}</td>
-            <td>{{ error.nom }}</td>
-            <td>{{ error.field }}</td>
-            <td>{{ error.originalValue }}</td>
-            <td>{{ error.reason }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  } @else {
-    <p>Aucune erreur détectée sur les champs sexe et actif.</p>
   }
-</div>
 
-<div class="siret-errors-block">
-  <h2>Erreurs de SIRET</h2>
+  <!-- Modale des erreurs -->
+  @if (isErrorModalOpen) {
+    <div class="modal-backdrop" (click)="closeErrorModal()">
+      <div class="error-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Erreurs détectées</h2>
 
-  <p><strong>Nombre de SIRET en erreur :</strong> {{ totalSiretErrors }}</p>
+          <button
+            type="button"
+            class="modal-close-button"
+            (click)="closeErrorModal()"
+            aria-label="Fermer la modale"
+          >
+            ×
+          </button>
+        </div>
 
-  @if (siretErrors.length > 0) {
-    <table>
-      <thead>
-        <tr>
-          <th>Ligne</th>
-          <th>SIRET</th>
-          <th>Nom</th>
-          <th>Longueur</th>
-          <th>Erreur</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (error of siretErrors; track error.lineNumber + error.siret) {
-          <tr>
-            <td>{{ error.lineNumber }}</td>
-            <td>{{ error.siret }}</td>
-            <td>{{ error.nom }}</td>
-            <td>{{ error.length }}</td>
-            <td>{{ error.reason }}</td>
-          </tr>
+        <p>
+          <strong>
+            {{ totalSiretErrors + totalFieldErrors }} erreur(s) détectée(s).
+          </strong>
+          Corrigez le fichier Excel avant de générer le CSV.
+        </p>
+
+        @if (siretErrors.length > 0) {
+          <h3>Erreurs de SIRET</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Ligne</th>
+                <th>SIRET</th>
+                <th>Nom</th>
+                <th>Longueur</th>
+                <th>Erreur</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (error of siretErrors; track error.lineNumber + error.siret) {
+                <tr>
+                  <td>{{ error.lineNumber }}</td>
+                  <td>{{ error.siret }}</td>
+                  <td>{{ error.nom }}</td>
+                  <td>{{ error.length }}</td>
+                  <td>{{ error.reason }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
         }
-      </tbody>
-    </table>
-  } @else {
-    <p>Aucune erreur de longueur détectée sur les SIRET.</p>
-  }
-</div>
+
+        @if (fieldErrors.length > 0) {
+          <h3>Erreurs de champs</h3>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Ligne</th>
+                <th>SIRET</th>
+                <th>Nom</th>
+                <th>Champ</th>
+                <th>Valeur trouvée</th>
+                <th>Erreur</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (error of fieldErrors; track error.lineNumber + error.field + error.originalValue) {
+                <tr>
+                  <td>{{ error.lineNumber }}</td>
+                  <td>{{ error.siret }}</td>
+                  <td>{{ error.nom }}</td>
+                  <td>{{ error.field }}</td>
+                  <td>{{ error.originalValue || '-' }}</td>
+                  <td>{{ error.reason }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+
+        @if (siretErrors.length === 0 && fieldErrors.length === 0) {
+          <p>Aucune erreur à afficher.</p>
+        }
+
+        <div class="modal-actions">
+          <button type="button" (click)="closeErrorModal()">
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
   }
 </section>

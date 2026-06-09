@@ -38,12 +38,13 @@ interface FieldErrorInfo {
   styleUrls: ['./excel-dedoublonnage.component.scss']
 })
 export class ExcelDedoublonnageComponent {
+  @ViewChild('fileInput') fileInputRef!: ElementRef<HTMLInputElement>;
+
   originalRows: ExcelRow[] = [];
   cleanedRows: ExcelRow[] = [];
   duplicateInfos: DuplicateInfo[] = [];
   siretErrors: SiretErrorInfo[] = [];
   fieldErrors: FieldErrorInfo[] = [];
-  @ViewChild('fileInput') fileInputRef!: ElementRef<HTMLInputElement>;
 
   fileName = '';
   sheetName = '';
@@ -53,6 +54,9 @@ export class ExcelDedoublonnageComponent {
   totalSiretErrors = 0;
   totalFieldErrors = 0;
   isFileLoaded = false;
+
+  // Cette ligne indique si la modale des erreurs est ouverte
+  isErrorModalOpen = false;
 
   /**
    * Cette méthode est appelée quand l'utilisateur sélectionne un fichier Excel.
@@ -115,39 +119,39 @@ export class ExcelDedoublonnageComponent {
    * - ligne 2 Excel = vraie ligne d'entête
    * - ligne 3+ Excel = données
    */
- buildRowsFromRawData(rawData: any[][]): ExcelRow[] {
-  if (!rawData || rawData.length < 2) {
-    return [];
-  }
+  buildRowsFromRawData(rawData: any[][]): ExcelRow[] {
+    if (!rawData || rawData.length < 2) {
+      return [];
+    }
 
-  // Cette ligne récupère la vraie ligne d'entête
-  const headerRow = rawData[1];
+    // Cette ligne récupère la vraie ligne d'entête
+    const headerRow = rawData[1];
 
-  // Cette ligne récupère toutes les lignes de données
-  const dataRows = rawData.slice(2);
+    // Cette ligne récupère toutes les lignes de données
+    const dataRows = rawData.slice(2);
 
-  return dataRows.map((row: any[], dataIndex: number) => {
-    const rowObject: ExcelRow = {};
+    return dataRows.map((row: any[], dataIndex: number) => {
+      const rowObject: ExcelRow = {};
 
-    headerRow.forEach((headerCell: any, index: number) => {
-      // Cette ligne sécurise le nom de colonne
-      const columnName = String(headerCell ?? '').trim();
+      headerRow.forEach((headerCell: any, index: number) => {
+        // Cette ligne sécurise le nom de colonne
+        const columnName = String(headerCell ?? '').trim();
 
-      // Cette condition ignore les colonnes sans nom
-      if (!columnName) {
-        return;
-      }
+        // Cette condition ignore les colonnes sans nom
+        if (!columnName) {
+          return;
+        }
 
-      // Cette ligne reconstruit l'objet avec le bon nom de colonne
-      rowObject[columnName] = row[index] ?? '';
+        // Cette ligne reconstruit l'objet avec le bon nom de colonne
+        rowObject[columnName] = row[index] ?? '';
+      });
+
+      // Cette ligne mémorise le vrai numéro de ligne Excel d'origine
+      rowObject['__excelLineNumber'] = dataIndex + 3;
+
+      return rowObject;
     });
-
-    // Cette ligne mémorise le vrai numéro de ligne Excel d'origine
-    rowObject['__excelLineNumber'] = dataIndex + 3;
-
-    return rowObject;
-  });
-}
+  }
 
   /**
    * Cette méthode traite les lignes importées :
@@ -172,7 +176,6 @@ export class ExcelDedoublonnageComponent {
       // Cette ligne normalise le NOM
       const normalizedNom = this.normalizeText(rawNom);
 
-      // Cette ligne calcule le vrai numéro de ligne Excel
       // Cette ligne récupère le vrai numéro de ligne Excel d'origine
       const excelLineNumber = Number(row['__excelLineNumber'] ?? index + 3);
 
@@ -229,8 +232,13 @@ export class ExcelDedoublonnageComponent {
     // Cette ligne analyse les erreurs de longueur sur les SIRET après dédoublonnage
     this.analyzeSiretErrors();
 
-    // Cette ligne analyse les erreurs métier sur sexe et actif
+    // Cette ligne analyse les erreurs métier
     this.analyzeFieldErrors();
+
+    // Cette ligne ouvre automatiquement la modale s'il existe des erreurs
+    if (this.hasBlockingErrors()) {
+      this.openErrorModal();
+    }
   }
 
   /**
@@ -246,7 +254,7 @@ export class ExcelDedoublonnageComponent {
         // Cette ligne récupère le NOM pour l'affichage
         const nom = String(this.findNomValue(row) ?? '').trim();
 
-        // Cette ligne calcule le numéro de ligne dans le tableau nettoyé
+        // Cette ligne calcule le numéro de ligne Excel réel
         const lineNumber = Number(row['__excelLineNumber'] ?? index + 3);
 
         // Cette condition ignore les lignes sans SIRET
@@ -281,13 +289,13 @@ export class ExcelDedoublonnageComponent {
 
   /**
    * Cette méthode analyse les champs métier après dédoublonnage
-   * et repère les erreurs sur sexe et actif.
+   * et repère les erreurs sur sexe, actif et rôle.
    */
   analyzeFieldErrors(): void {
     this.fieldErrors = this.cleanedRows.flatMap((row, index) => {
       const errors: FieldErrorInfo[] = [];
 
-      // Cette ligne calcule le numéro de ligne dans le tableau nettoyé
+      // Cette ligne calcule le numéro de ligne Excel réel
       const lineNumber = Number(row['__excelLineNumber'] ?? index + 3);
 
       // Cette ligne récupère les infos utiles pour l'affichage
@@ -300,14 +308,14 @@ export class ExcelDedoublonnageComponent {
       // Cette ligne lit la valeur brute du champ actif
       const rawActif = String(this.findActifValue(row) ?? '').trim();
 
+      // Cette ligne lit la valeur brute du rôle
+      const rawRole = String(this.findRoleValue(row) ?? '').trim();
+
       // Cette ligne tente de normaliser le sexe
       const normalizedSexe = this.normalizeSexe(rawSexe);
 
       // Cette ligne tente de normaliser actif
       const normalizedActif = this.normalizeActif(rawActif);
-
-      // Cette ligne lit la valeur brute du rôle
-      const rawRole = String(this.findRoleValue(row) ?? '').trim();
 
       // Cette condition détecte une erreur sur le sexe
       if (rawSexe && !normalizedSexe) {
@@ -334,16 +342,16 @@ export class ExcelDedoublonnageComponent {
       }
 
       // Cette condition détecte une erreur si le rôle est vide
-    if (!rawRole) {
-      errors.push({
-        lineNumber,
-        field: 'role',
-        originalValue: '',
-        reason: 'Rôle obligatoire manquant',
-        nom,
-        siret
-      });
-    }
+      if (!rawRole) {
+        errors.push({
+          lineNumber,
+          field: 'role',
+          originalValue: '',
+          reason: 'Rôle obligatoire manquant',
+          nom,
+          siret
+        });
+      }
 
       return errors;
     });
@@ -422,44 +430,42 @@ export class ExcelDedoublonnageComponent {
    * Cette méthode recherche la valeur du sexe.
    */
   findSexeValue(row: ExcelRow): string {
-  const possibleKeys = ['Sexe', 'SEXE', 'sexe'];
+    for (const key in row) {
+      const normalizedKey = key.trim().toLowerCase();
 
-  for (const key in row) {
-    const normalizedKey = key.trim().toLowerCase();
-
-    // ✔️ match exact OU contient le mot
-    if (
-      possibleKeys.includes(normalizedKey) ||
-      normalizedKey.includes('sexe')
-    ) {
-      return String(row[key] ?? '').trim();
+      // Cette condition détecte toutes les variantes de colonne sexe
+      if (normalizedKey.includes('sexe')) {
+        return String(row[key] ?? '').trim();
+      }
     }
-  }
 
-  return '';
-}
+    return '';
+  }
 
   /**
    * Cette méthode recherche la valeur du champ actif.
    */
   findActifValue(row: ExcelRow): string {
-  for (const key in row) {
-    const normalizedKey = key.trim().toLowerCase();
+    for (const key in row) {
+      const normalizedKey = key.trim().toLowerCase();
 
-    // 🔥 on détecte toutes les variantes
-    if (normalizedKey.includes('actif')) {
-      return String(row[key] ?? '').trim();
+      // Cette condition détecte toutes les variantes de colonne actif
+      if (normalizedKey.includes('actif')) {
+        return String(row[key] ?? '').trim();
+      }
     }
+
+    return '';
   }
 
-  return '';
-}
-
+  /**
+   * Cette méthode recherche la valeur du rôle.
+   */
   findRoleValue(row: ExcelRow): string {
     for (const key in row) {
       const normalizedKey = key.trim().toLowerCase();
 
-      // 🔥 on détecte toutes les variantes
+      // Cette condition détecte toutes les variantes de colonne rôle
       if (
         normalizedKey.includes('role') ||
         normalizedKey.includes('rôle')
@@ -468,8 +474,8 @@ export class ExcelDedoublonnageComponent {
       }
     }
 
-  return '';
-}
+    return '';
+  }
 
   /**
    * Cette méthode normalise un SIRET.
@@ -489,97 +495,99 @@ export class ExcelDedoublonnageComponent {
       .trim()
       .toUpperCase();
   }
-/**
- * Cette méthode normalise la valeur du sexe.
- */
-normalizeSexe(value: unknown): string {
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase();
 
-  // Cette condition accepte une valeur déjà normalisée pour femme
-  if (normalized === '2') {
-    return '2';
+  /**
+   * Cette méthode normalise la valeur du sexe.
+   */
+  normalizeSexe(value: unknown): string {
+    const normalized = String(value ?? '')
+      .trim()
+      .toLowerCase();
+
+    // Valeurs déjà normalisées
+    if (normalized === '2') {
+      return '2';
+    }
+
+    if (normalized === '1') {
+      return '1';
+    }
+
+    // Valeurs féminines
+    if (
+      normalized === 'f' ||
+      normalized === 'femme' ||
+      normalized === 'féminin' ||
+      normalized === 'feminin'
+    ) {
+      return '2';
+    }
+
+    // Valeurs masculines
+    if (
+      normalized === 'm' ||
+      normalized === 'homme' ||
+      normalized === 'masculin'
+    ) {
+      return '1';
+    }
+
+    return '';
   }
 
-  // Cette condition accepte une valeur déjà normalisée pour homme
-  if (normalized === '1') {
-    return '1';
-  }
-
-  // Cette condition gère les valeurs féminines
-  if (
-    normalized === 'femme' ||
-    normalized === 'féminin' ||
-    normalized === 'feminin' ||
-    normalized === 'F' ||
-    normalized === 'f'
-  ) {
-    return '2';
-  }
-
-  // Cette condition gère les valeurs masculines
-  if (
-    normalized === 'homme' ||
-    normalized === 'masculin' ||
-    normalized === 'M' ||
-    normalized === 'm'
-  ) {
-    return '1';
-  }
-
-  // Cette ligne retourne vide si la valeur est invalide
-  return '';
-}
-
-/**
- * Cette méthode normalise la valeur actif.
- */
+  /**
+   * Cette méthode normalise la valeur actif.
+   */
   normalizeActif(value: unknown): string {
-  const normalized = String(value ?? '')
-    .trim()
-    .toLowerCase();
+    const normalized = String(value ?? '')
+      .trim()
+      .toLowerCase();
 
-  // Cette condition accepte une valeur déjà normalisée active
-  if (normalized === '1') {
-    return '1';
+    // Valeurs déjà normalisées
+    if (normalized === '1') {
+      return '1';
+    }
+
+    if (normalized === '0') {
+      return '0';
+    }
+
+    // Valeurs textuelles
+    if (
+      normalized === 'oui' ||
+      normalized === 'o' ||
+      normalized === 'true'
+    ) {
+      return '1';
+    }
+
+    if (
+      normalized === 'non' ||
+      normalized === 'n' ||
+      normalized === 'false'
+    ) {
+      return '0';
+    }
+
+    return '';
   }
 
-  // Cette condition accepte une valeur déjà normalisée inactive
-  if (normalized === '0') {
-    return '0';
+  /**
+   * Cette méthode normalise certains rôles connus.
+   */
+  normalizeRole(value: string): string {
+    const role = value.trim().toLowerCase();
+
+    if (role === 'gestionnaire entreprise') {
+      return 'Gestionnaire Entreprise';
+    }
+
+    if (role === 'gestionnaire utilisateur') {
+      return 'Gestionnaire Utilisateur';
+    }
+
+    return value.trim();
   }
-
-  // Cette condition transforme oui en 1
-  if (normalized === 'oui') {
-    return '1';
-  }
-
-  // Cette condition transforme non en 0
-  if (normalized === 'non') {
-    return '0';
-  }
-
-  // Cette ligne retourne vide si la valeur est invalide
-  return '';
-}
-
-/**
- * Cette méthode normalise certains rôles connus.
- */
-normalizeRole(value: string): string {
-  const role = value.trim().toLowerCase();
-
-  if (role === 'gestionnaire entreprise') {
-    return 'Gestionnaire Entreprise';
-  }
-
-  if (role === 'gestionnaire utilisateur') {
-    return 'Gestionnaire Utilisateur';
-  }
-
-  return value.trim();
-}
 
   /**
    * Cette méthode transforme une ligne source vers le format CSV final attendu.
@@ -604,7 +612,7 @@ normalizeRole(value: string): string {
       // Cette ligne normalise actif vers 1 ou 0
       actif: this.normalizeActif(this.findActifValue(row)),
 
-      // Cette ligne mappe le rôle vers la colonne finale "role"
+      // Cette ligne normalise le rôle
       role: this.normalizeRole(this.findRoleValue(row))
     };
   }
@@ -702,11 +710,27 @@ normalizeRole(value: string): string {
   }
 
   /**
- * Cette méthode indique s'il existe au moins une erreur bloquante.
- */
-hasBlockingErrors(): boolean {
-  return this.totalSiretErrors > 0 || this.totalFieldErrors > 0;
-}
+   * Cette méthode indique s'il existe au moins une erreur bloquante.
+   */
+  hasBlockingErrors(): boolean {
+    return this.totalSiretErrors > 0 || this.totalFieldErrors > 0;
+  }
+
+  /**
+   * Cette méthode ouvre la modale des erreurs.
+   */
+  openErrorModal(): void {
+    if (this.hasBlockingErrors()) {
+      this.isErrorModalOpen = true;
+    }
+  }
+
+  /**
+   * Cette méthode ferme la modale des erreurs.
+   */
+  closeErrorModal(): void {
+    this.isErrorModalOpen = false;
+  }
 
   /**
    * Cette méthode construit le nom du fichier CSV exporté.
@@ -716,44 +740,45 @@ hasBlockingErrors(): boolean {
     return `${baseName}_sans_doublons.csv`;
   }
 
-/**
- * Cette méthode remet le composant à zéro.
- */
-reset(): void {
-  // Cette ligne vide les données d'origine
-  this.originalRows = [];
+  /**
+   * Cette méthode remet le composant à zéro.
+   */
+  reset(): void {
+    // Cette ligne vide les données d'origine
+    this.originalRows = [];
 
-  // Cette ligne vide les données nettoyées
-  this.cleanedRows = [];
+    // Cette ligne vide les données nettoyées
+    this.cleanedRows = [];
 
-  // Cette ligne vide les doublons détectés
-  this.duplicateInfos = [];
+    // Cette ligne vide les doublons détectés
+    this.duplicateInfos = [];
 
-  // Cette ligne vide les erreurs SIRET
-  this.siretErrors = [];
+    // Cette ligne vide les erreurs SIRET
+    this.siretErrors = [];
 
-  // Cette ligne vide les erreurs métier
-  this.fieldErrors = [];
+    // Cette ligne vide les erreurs métier
+    this.fieldErrors = [];
 
-  // Cette ligne réinitialise les infos fichier
-  this.fileName = '';
-  this.sheetName = '';
+    // Cette ligne ferme la modale
+    this.isErrorModalOpen = false;
 
-  // Cette ligne remet les compteurs à zéro
-  this.totalRows = 0;
-  this.totalValidCleanedRows = 0;
-  this.totalDuplicatesRemoved = 0;
-  this.totalSiretErrors = 0;
-  this.totalFieldErrors = 0;
+    // Cette ligne réinitialise les infos fichier
+    this.fileName = '';
+    this.sheetName = '';
 
-  // Cette ligne indique qu'aucun fichier n'est chargé
-  this.isFileLoaded = false;
+    // Cette ligne remet les compteurs à zéro
+    this.totalRows = 0;
+    this.totalValidCleanedRows = 0;
+    this.totalDuplicatesRemoved = 0;
+    this.totalSiretErrors = 0;
+    this.totalFieldErrors = 0;
 
-  // Cette ligne vide visuellement l'input file dans le DOM
-  if (this.fileInputRef?.nativeElement) {
-    this.fileInputRef.nativeElement.value = '';
+    // Cette ligne indique qu'aucun fichier n'est chargé
+    this.isFileLoaded = false;
+
+    // Cette ligne vide visuellement l'input file dans le DOM
+    if (this.fileInputRef?.nativeElement) {
+      this.fileInputRef.nativeElement.value = '';
+    }
   }
-}
-
-
 }
