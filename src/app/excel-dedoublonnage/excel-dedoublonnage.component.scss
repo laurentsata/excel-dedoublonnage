@@ -1,23 +1,54 @@
 .excel-cleaner {
-  max-width: 1000px;
-  margin: 24px auto;
-  padding: 24px;
-  border: 1px solid #dcdcdc;
-  border-radius: 12px;
-  background: #ffffff;
+  max-width: 1400px;
+  margin: 32px auto;
+  padding: 32px;
+  border: 1px solid #d2d4e6;
+  border-radius: 16px;
+  background: #f5f6fa;
+  color: #1f1f1f;
 }
 
-.upload-block,
-.summary-block,
-.actions-block,
-.duplicates-block {
+/* Titres */
+.excel-cleaner h1 {
+  color: #6e51c2;
+  font-size: 36px;
   margin-bottom: 24px;
 }
 
+.excel-cleaner h2 {
+  color: #1f1f1f;
+  margin-bottom: 16px;
+}
+
+/* Blocs */
+.upload-block,
+.summary-block,
+.actions-block,
+.duplicates-block,
+.siret-errors-block,
+.field-errors-block {
+  margin-bottom: 24px;
+}
+
+/* Cartes */
+.summary-block,
+.duplicates-block,
+.siret-errors-block,
+.field-errors-block,
+.upload-block {
+  background: #ffffff;
+  border: 1px solid #d2d4e6;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Upload */
 .upload-label {
   display: inline-block;
   margin-bottom: 8px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #1f1f1f;
 }
 
 input[type='file'] {
@@ -25,43 +56,119 @@ input[type='file'] {
   margin-top: 8px;
 }
 
+/* Boutons */
 button {
   margin-right: 12px;
-  padding: 10px 16px;
+  padding: 12px 20px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #222;
+  background: #6e51c2;
   color: #fff;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   opacity: 0.9;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+/* Bouton erreur */
+button.error-button {
+  background: #d91e18;
+  color: #fff;
+}
+
+/* Bouton réinitialiser */
+.actions-block button:last-child {
+  background: #009aa6;
+}
+
+/* Résumé */
+.summary-block strong {
+  color: #6e51c2;
+}
+
+/* Tableaux */
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 12px;
+  background: #fff;
 }
 
 th,
 td {
-  border: 1px solid #dcdcdc;
-  padding: 10px;
+  border: 1px solid #d2d4e6;
+  padding: 12px;
   text-align: left;
 }
 
 thead {
-  background: #f5f5f5;
+  background: #6e51c2;
+  color: white;
 }
 
-.siret-errors-block,
+tbody tr:nth-child(even) {
+  background: #f5f6fa;
+}
+
+tbody tr:hover {
+  background: #d2d4e6;
+}
+
+/* Bloc erreurs SIRET */
+.siret-errors-block {
+  margin-top: 24px;
+}
+
+.siret-errors-block h2 {
+  color: #d91e18;
+}
+
+/* Bloc erreurs métier */
 .field-errors-block {
   margin-top: 24px;
 }
 
-button.error-button {
-  background: #c62828;
-  color: #fff;
+.field-errors-block h2 {
+  color: #e05206;
+}
+
+/* Alerte */
+.alert-error {
+  margin: 20px 0;
+  padding: 16px;
+  background: #fce8e8;
+  border-left: 5px solid #d91e18;
+  border-radius: 8px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .excel-cleaner {
+    margin: 12px;
+    padding: 16px;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .actions-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  button {
+    width: 100%;
+  }
 }

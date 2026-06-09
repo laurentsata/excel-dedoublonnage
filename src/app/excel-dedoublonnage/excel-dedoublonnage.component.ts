@@ -564,6 +564,23 @@ normalizeSexe(value: unknown): string {
   return '';
 }
 
+/**
+ * Cette méthode normalise certains rôles connus.
+ */
+normalizeRole(value: string): string {
+  const role = value.trim().toLowerCase();
+
+  if (role === 'gestionnaire entreprise') {
+    return 'Gestionnaire Entreprise';
+  }
+
+  if (role === 'gestionnaire utilisateur') {
+    return 'Gestionnaire Utilisateur';
+  }
+
+  return value.trim();
+}
+
   /**
    * Cette méthode transforme une ligne source vers le format CSV final attendu.
    */
@@ -588,7 +605,7 @@ normalizeSexe(value: unknown): string {
       actif: this.normalizeActif(this.findActifValue(row)),
 
       // Cette ligne mappe le rôle vers la colonne finale "role"
-      role: this.findRoleValue(row)
+      role: this.normalizeRole(this.findRoleValue(row))
     };
   }
 
